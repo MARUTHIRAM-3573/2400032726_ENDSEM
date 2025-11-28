@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Student Table — Sorting & Filtering</title>
+
+  <!-- Inline CSS -->
+  <style>
+    :root {
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      --accent: #2b6cb0;
+      --muted: #6b7280;
+      --card-bg: #ffffff;
+      --soft: #f3f6fb;
+    }
+
+    body {
+      margin: 24px;
+      background: linear-gradient(180deg, #f7fbff 0%, #ffffff 100%);
+      color: #111827;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 18px;
+      box-shadow: 0 6px 20px rgba(17,24,39,0.06);
+    }
+
+    h1 {
+      margin: 0 0 12px 0;
+      font-size: 22px;
+      color: var(--accent);
+      text-align:center;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .controls > * {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #e6eefb;
+      background: var(--soft);
+      font-size: 14px;
+    }
+
+    label.small {
+      font-size: 13px;
+      color: var(--muted);
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-align:center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 15px;
+    }
+
+    thead th {
+      background: linear-gradient(90deg, #eef6ff, #ffffff);
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 2px solid #e6eefb;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #fbfdff;
+    }
+
+    .small-note {
+      font-size: 13px;
+      color: var(--muted);
+      text-align:center;
+      margin-top:8px;
+    }
+
+    .btn {
+      cursor: pointer;
+      border: none;
+      background: var(--accent);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    .btn.ghost {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid #cfe3fb;
+    }
+
+    .controls .group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    @media (max-width: 640px) {
+      .controls {
+        flex-direction: column;
+      }
+      thead th, tbody td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <h1>Student Table — Sorting & Filtering</h1>
+
+    <!-- Controls -->
+    <div class="controls" aria-label="controls">
+      <div style="min-width:210px">
+        <label class="small">Search (Name)</label>
+        <input id="searchName" placeholder="Type name to filter..." />
+      </div>
+
+      <div style="min-width:160px">
+        <label class="small">Minimum Marks</label>
+        <input id="minMarks" type="number" min="0" max="100" value="60" />
+      </div>
+
+      <div class="group">
+        <div>
+          <label class="small">Sort by</label>
+          <select id="sortBy">
+            <option value="marks">Marks</option>
+            <option value="roll">Roll</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="small">Order</label>
+          <select id="sortOrder">
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="align-self:flex-end">
+        <label class="small" style="opacity:0">button</label>
+        <button id="applyBtn" class="btn">Apply</button>
+        <button id="resetBtn" class="btn ghost" title="Show all (reset)">Reset</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div id="tableWrap" aria-live="polite">
+      <table id="studentTable" role="table" aria-label="Student results">
+        <thead>
+          <tr>
+            <th data-key="roll">Roll ▲▼</th>
+            <th data-key="name">Name ▲▼</th>
+            <th data-key="marks">Marks ▲▼</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <p class="small-note">
+      Default: students with marks &gt;= <strong id="minLabel">60</strong>, sorted by <strong id="sortLabel">Marks desc</strong>.
+    </p>
+  </div>
+
+  <!-- Inline JavaScript -->
+  <script>
+    // Default student data (you can edit/add directly here)
+    const defaultStudents = [
+      { roll: 101, name: "Ravi", marks: 85 },
+      { roll: 102, name: "Asha", marks: 55 },
+      { roll: 103, name: "Kiran", marks: 72 },
+      { roll: 104, name: "Meena", marks: 40 },
+      { roll: 105, name: "Tarun", marks: 90 },
+      { roll: 106, name: "Priya", marks: 68 },
+      { roll: 107, name: "Suresh", marks: 61 },
+      { roll: 108, name: "Anita", marks: 77 }
+    ];
+
+    // State
+    let students = [...defaultStudents];
+
+    // Elements
+    const tbody = document.querySelector("#studentTable tbody");
+    const searchName = document.getElementById("searchName");
+    const minMarks = document.getElementById("minMarks");
+    const sortBy = document.getElementById("sortBy");
+    const sortOrder = document.getElementById("sortOrder");
+    const applyBtn = document.getElementById("applyBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const minLabel = document.getElementById("minLabel");
+    const sortLabel = document.getElementById("sortLabel");
+
+    // Render rows based on provided list
+    function renderRows(list) {
+      tbody.innerHTML = "";
+      if (!list.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = "<td colspan='3' style='text-align:center; padding:18px; color:#666'>No rows to display</td>";
+        tbody.appendChild(tr);
+        return;
+      }
+      list.forEach(s => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = "<td>" + s.roll + "</td>" +
+                       "<td>" + escapeHtml(s.name) + "</td>" +
+                       "<td>" + s.marks + "</td>";
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Simple HTML escape for safety
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[m]));
+    }
+
+    // Apply filter and sort
+    function applyFiltersAndSort() {
+      const nameQ = searchName.value.trim().toLowerCase();
+      const min = Number(minMarks.value || 0);
+      const key = sortBy.value;
+      const order = sortOrder.value;
+
+      // update labels
+      minLabel.textContent = min;
+      sortLabel.textContent = key.charAt(0).toUpperCase() + key.slice(1) + " " + order;
+
+      // Filter
+      let filtered = students.filter(s => {
+        const nameMatch = !nameQ || s.name.toLowerCase().includes(nameQ);
+        const marksMatch = s.marks >= min;
+        return nameMatch && marksMatch;
+      });
+
+      // Sort
+      filtered.sort((a, b) => {
+        let va = a[key], vb = b[key];
+        // normalize for name
+        if (key === "name") {
+          va = String(va).toLowerCase();
+          vb = String(vb).toLowerCase();
+          return order === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        // numeric comparison for roll/marks
+        return order === "asc" ? (va - vb) : (vb - va);
+      });
+
+      renderRows(filtered);
+    }
+
+    // Reset to defaults (show all)
+    function resetAll() {
+      searchName.value = "";
+      minMarks.value = 0;
+      sortBy.value = "marks";
+      sortOrder.value = "desc";
+      minLabel.textContent = 0;
+      sortLabel.textContent = "Marks desc";
+      renderRows(students);
+    }
+
+    // Header click to quickly sort by column toggling order
+    document.querySelectorAll("thead th").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (!key) return;
+        if (sortBy.value === key) {
+          sortOrder.value = sortOrder.value === "asc" ? "desc" : "asc";
+        } else {
+          sortBy.value = key;
+          sortOrder.value = "desc";
+        }
+        applyFiltersAndSort();
+      });
+    });
+
+    // Event listeners
+    applyBtn.addEventListener("click", applyFiltersAndSort);
+    resetBtn.addEventListener("click", resetAll);
+
+    // Also apply when pressing Enter in search or minMarks
+    [searchName, minMarks].forEach(el =>
+      el.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") applyFiltersAndSort();
+      })
+    );
+
+    // Initial render: apply default (minMarks default is 60)
+    // Set minMarks default value to 60 to match original brief
+    minMarks.value = 60;
+    sortBy.value = "marks";
+    sortOrder.value = "desc";
+    applyFiltersAndSort();
+  </script>
+</body>
+</html>
